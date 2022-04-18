@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import '@openzeppelin/contracts/utils/Strings.sol';
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
+import "hardhat/console.sol";
 
 contract PD1 is Context{
     using Strings for uint256;
@@ -20,12 +21,23 @@ contract PD1 is Context{
     struct TokenCertificateHolder {
       address holder;
       address owner;
+      bool isValid;
     }
 
     mapping(uint256 => TokenCertificateHolder) private _tokenCertificateHolder;
 
     event Transfer(address from, address to, uint256 tokenId);
     event ChangeHolder(address owner, address holder, uint256 tokneId);
+
+    modifier existsToken(uint256 tokenId) {
+      require(_exists(tokenId), "nonexistent token");
+      _;
+    } 
+
+    modifier notZeroAddress(address addr) {
+      require(addr != address(0), "zero address");
+      _;
+    }
 
     constructor(string memory name_, string memory symbol_, string memory baseURI_) {
         _name = name_;
@@ -37,25 +49,20 @@ contract PD1 is Context{
         return _name;
     }
 
-    /**
-     * @dev See {IERC721Metadata-symbol}.
-     */
     function getSymbol() public view returns (string memory) {
         return _symbol;
     }
 
 
-    function getTokenURI(uint256 tokenId) public view returns (string memory) {
-      require(_exists(tokenId), "nonexistent token");
-        return bytes(_baseURI).length != 0 ? string(abi.encodePacked(_baseURI, tokenId.toString())) : '';
+    function getTokenURI(uint256 tokenId) public view existsToken(tokenId) returns (string memory) {
+      return bytes(_baseURI).length != 0 ? string(abi.encodePacked(_baseURI, tokenId.toString())) : '';
     }
 
     function _exists(uint256 tokenId) private view returns (bool) {
         return _owners[tokenId] != address(0);
     }
 
-    function mint(address owner) public returns (uint256 tokenId){
-        require(owner != address(0), "mint to the zero address");
+    function mint(address owner) public notZeroAddress(owner) returns (uint256 tokenId){
         _tokenIdCounter.increment();
         tokenId = _tokenIdCounter.current();
         _owners[tokenId] = owner;
@@ -64,10 +71,7 @@ contract PD1 is Context{
         emit Transfer(address(0), owner, tokenId);
     }
 
-    function setTokenCertificateHolder(address holder, uint256 tokenId) public {
-      require(_exists(tokenId), "nonexistent token");
-      require(holder != address(0), "holder zero address");
-
+    function setTokenCertificateHolder(address holder, uint256 tokenId) public  notZeroAddress(holder) existsToken(tokenId){
       address tokenOwner = _owners[tokenId];
       require(tokenOwner != holder, "owner can not be holder");
 
@@ -76,49 +80,56 @@ contract PD1 is Context{
       
       _tokenCertificateHolder[tokenId].holder = holder;
       _tokenCertificateHolder[tokenId].owner = owner;
+      _tokenCertificateHolder[tokenId].isValid = true;
 
       emit ChangeHolder(owner, holder, tokenId);
     }
 
-    function clearTokenCertificateHolder(uint256 tokenId) public {
-      require(_exists(tokenId), "nonexistent token");
+    function clearTokenCertificateHolder(uint256 tokenId) public existsToken(tokenId) {
+      bool isValid = _tokenCertificateHolder[tokenId].isValid;
+      require(isValid, "token not exists holder");
       address owner = _tokenCertificateHolder[tokenId].owner;
       require(_msgSender() == owner, "caller is not owner");
-      delete _tokenCertificateHolder[tokenId];
+      _tokenCertificateHolder[tokenId].owner = address(0);
+      _tokenCertificateHolder[tokenId].holder = address(0);
+      _tokenCertificateHolder[tokenId].isValid = false;
 
       emit ChangeHolder(address(0), address(0), tokenId);
     }
 
-    function getHolder(address owner, uint256 tokenId) public view returns(address holder) {
-      require(_exists(tokenId), "nonexistent token");
-      require(owner == address(0), "owner zero address");
-      require(_tokenCertificateHolder[tokenId].owner == owner, "owner not exists");
-      return _tokenCertificateHolder[tokenId].holder;
+    function getHolder(address owner, uint256 tokenId) public view  notZeroAddress(owner) existsToken(tokenId) returns(address holder) {
+      bool isValid = _tokenCertificateHolder[tokenId].isValid;
+      if (isValid && _tokenCertificateHolder[tokenId].owner == owner) {
+        return _tokenCertificateHolder[tokenId].holder;
+      } else {
+        return address(0);
+      }
     }
 
-    function hasHoldToken(address owner, address holder, uint256 tokenId) public view returns(bool){
-      require(holder == address(0), "holder zero address");
-      address oldHolder = getHolder(owner, tokenId);
-      return oldHolder == holder && 
-      _tokenCertificateHolder[tokenId].owner == owner;
+    function hasHoldToken(address owner, address holder, uint256 tokenId) public view  notZeroAddress(owner) notZeroAddress(holder) existsToken(tokenId) returns(bool){
+      bool isValid = _tokenCertificateHolder[tokenId].isValid;
+      if (isValid) {
+        return _tokenCertificateHolder[tokenId].holder == holder && 
+            _tokenCertificateHolder[tokenId].owner == owner;
+      }
+      return false;
     }
 
-    function _ownerOf(address owner, uint256 tokenId) private view returns(bool) {
-      require(_exists(tokenId), "nonexistent token");
-      require(owner == address(0), "owner zero address");
+    function _ownerOf(address owner, uint256 tokenId) private view notZeroAddress(owner) existsToken(tokenId) returns(bool) {
       return _owners[tokenId] == owner;
     }
 
-    function _transfer(
+    function transfer(
         address from,
         address to,
         uint256 tokenId
-    ) private {
+    ) public {
         require(_ownerOf(from, tokenId), "caller not owner");
-        require(to == address(0), "transfer to zero address");
+        require(to != address(0), "transfer to zero address");
 
         _tokenCertificateHolder[tokenId].owner = to;
         _tokenCertificateHolder[tokenId].holder = address(0);
+        _tokenCertificateHolder[tokenId].isValid = false;
 
         _owners[tokenId] = to;
 
@@ -128,5 +139,8 @@ contract PD1 is Context{
         emit Transfer(from, to, tokenId);
     }
 
+    function balanceOf(address owner) public view  notZeroAddress(owner) returns (uint256) {
+        return _balances[owner];
+    }
 
 }
