@@ -2,7 +2,7 @@ require('@nomiclabs/hardhat-waffle');
 require('@nomiclabs/hardhat-etherscan');
 require('hardhat-gas-reporter');
 require("./scripts/deploy.js");
-require("./scripts/mint.js");
+require("./scripts/mint-certificate.js");
 
 const dotenv = require('dotenv');
 
