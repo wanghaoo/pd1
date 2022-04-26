@@ -61,7 +61,6 @@ contract PD1Certificate is Context {
   public view Owner721Token(contractAddress) returns (bool) {
     require(holderAddress != address(0), "zero holder address");
     address owner = _certificateHolder[contractAddress][tokenId].tokenOwner;
-
     require(owner == _msgSender(), "sender not owner");
 
     return _certificateHolder[contractAddress][tokenId].holder == holderAddress;
