@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.2;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
@@ -35,7 +35,6 @@ contract PD1Permission is ERC721URIStorage {
 
         return newItemId;
     }
-
 
     /**
      * @dev Return if "permissionTag" is the permission granted to the user by the Token owner
@@ -83,12 +82,17 @@ contract PD1Permission is ERC721URIStorage {
     }
 
     /**
-     * @dev Revoke "_to" user "_tokenId" permission
+     * @dev Revoke "_to" user "_tokenId" tonken permission
      * @param _to revoke user address
      * @param _tokenId revoke token id
      */
     function revoke(address _to, uint256 _tokenId)
-    external ZeroAddress(_to) payable {
+    external payable {
+      _revoke(_to, _tokenId);
+    }
+
+    function _revoke(address _to, uint256 _tokenId)
+    private ZeroAddress(_to) {
       require(_isApprovedOrOwner(_msgSender(), _tokenId), "gran caller is not owner nor approved");
 
       if (_grantPermission[_msgSender()][_to][_tokenId].permissionTag > 0) {
@@ -97,5 +101,24 @@ contract PD1Permission is ERC721URIStorage {
 
         emit PermissionChange(_msgSender(), _to, _tokenId, 0, "");
       }
+    }
+
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 tokenId,
+        bytes calldata data
+    ) public override {
+      super.safeTransferFrom(from, to, tokenId, data);
+      _revoke(to, tokenId);
+    }
+
+    function transferFrom(
+        address from,
+        address to,
+        uint256 tokenId
+    ) public override {
+      super.safeTransferFrom(from, to, tokenId);
+      _revoke(to, tokenId);
     }
 }
