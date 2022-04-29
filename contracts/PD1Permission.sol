@@ -114,13 +114,17 @@ contract PD1Permission is ERC721URIStorage {
       bytes32 _grantUserTokenPermissionIndexKey = _buildGrantUserTokenPermissionIndex(_msgSender(), _tokenId, _to, _permission);
       require(_grantUserTokenPermissionIndex[_grantUserTokenPermissionIndexKey] == 0, "user token permission existend");
 
+      if(_permissionPrimaryKey.current() == 0) {
+        _permissionTable.push(Permission(address(0), address(0), 0, 0, ""));
+      }
       // index permission
       _permissionPrimaryKey.increment();
+
       uint256 index = _permissionPrimaryKey.current();
 
       _grantUserTokenPermissionIndex[_grantUserTokenPermissionIndexKey] = index;
 
-      _permissionTable[index] = Permission(_msgSender(), _to, _tokenId, _permission, _reason);
+      _permissionTable.push(Permission(_msgSender(), _to, _tokenId, _permission, _reason));
 
       //build clear permission index
       bytes32 _ownerTokenIndexKey = _buildOwnerTokenIndexKey(_msgSender(), _tokenId);
@@ -162,9 +166,9 @@ contract PD1Permission is ERC721URIStorage {
      * @dev clear permission when transfer
      */
     function _clearTokenPermission(address _from, uint256 _tokenId)
-    private {
-      bytes32 _ownerTokenIndexKey =  _buildOwnerTokenIndexKey(_msgSender(), _tokenId);
-      if (_ownerTokenIndex[_ownerTokenIndexKey].length <= 0) {
+    internal{
+      bytes32 _ownerTokenIndexKey =  _buildOwnerTokenIndexKey(_from, _tokenId);
+      if (_ownerTokenIndex[_ownerTokenIndexKey].length == 0) {
         return;
       }
 
